@@ -151,7 +151,7 @@ export default function AboutSection() {
           </div>
         </div>
 
-        {/* Main content */}
+        {/* Main content - child elements set their own color; change text-* below to change color */}
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
             <h2 className="sm:text-4xl md:text-5xl text-2xl !leading-[110%] font-semibold text-gray-900 mb-8">

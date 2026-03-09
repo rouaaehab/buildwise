@@ -14,8 +14,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Use 5001 if server fell back from 5000 (see server terminal)
-      '/api': { target: 'http://localhost:5001', changeOrigin: true },
+      // Backend default port 5000; if it fell back to 5001, change target or set VITE_API_URL
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
 })

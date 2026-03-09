@@ -31,7 +31,7 @@ const contactMethods = [
     icon: Phone,
     title: 'Call Us',
     description: 'Speak directly with our team',
-    value: '+1 (555) 123-4567',
+    value: '+1 (555) 123-1111',
     link: 'tel:+15551234567',
     gradient: 'from-green-500/20 to-emerald-500/20',
   },
