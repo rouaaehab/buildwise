@@ -60,10 +60,28 @@ To see the app with sample content (engineer profile, projects, bookings, review
 2. In Supabase go to **Database → SQL Editor**, open `supabase/seed_demo_data.sql`, and run it.
 3. Refresh the app: **Browse engineers** shows the engineer with bio and projects, **My bookings** and **Messages** show the demo data. Log in as client to see bookings and chat; as engineer to see incoming booking and chat.
 
+## Deploy full app on Render (one service)
+
+The repo is set up so **one Render Web Service** serves both the API and the React app (no CORS, same origin).
+
+1. In [Render](https://render.com), create a **Web Service**, connect this repo, and use the **root** as the directory.
+2. **Build command:** `npm run build`  
+   **Start command:** `npm start`
+3. **Environment variables** (Settings → Environment):
+   - `VITE_API_URL` – leave **empty** (so the client uses same-origin `/api`)
+   - `VITE_SUPABASE_URL` – your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY` – Supabase anon key
+   - `SUPABASE_URL` – same as above
+   - `SUPABASE_SERVICE_ROLE_KEY` – Supabase service role key (from Project Settings → API)
+
+After deploy, the app and API are at the same URL (e.g. `https://buildwise-xxxx.onrender.com`). You can also use the optional `render.yaml` in the repo as a Blueprint.
+
 ## Scripts
 
 | Location | Command   | Description        |
 | -------- | --------- | ------------------ |
+| repo root | `npm run build` | Build client + install server deps (for Render) |
+| repo root | `npm start`     | Run API (and serve client if `client/dist` exists) |
 | server/  | `npm run dev`  | Start API with watch |
 | server/  | `npm start`    | Start API (production) |
 | client/  | `npm run dev`  | Start Vite dev server |

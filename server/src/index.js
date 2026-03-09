@@ -1,5 +1,7 @@
 import express from 'express';
-import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import { requireAuth } from './middleware/auth.js';
 import { ensureAvatarsBucket, ensureProjectImagesBucket, ensureCertificatesBucket } from './lib/storage.js';
@@ -15,12 +17,37 @@ import contactRoutes from './routes/contact.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS: allow Vite dev server and same-origin
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+// CORS: allow Vite dev server (any port), production frontend, and Vercel previews
+const allowedOrigins = [
+  'http://localhost:5173', 'http://localhost:3000',
+  'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176',
+  'http://127.0.0.1:5173', 'http://127.0.0.1:3000',
+  'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:5176',
+  'https://buildwise-psi.vercel.app',
+  'https://buildwise-git-main-rouaaehabs-projects.vercel.app',
+];
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/[^/]+\.vercel\.app$/.test(origin)) return true;
+  return false;
+}
+// Set CORS headers on every response first (so they're never missing)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  next();
+});
+// Preflight: respond to OPTIONS immediately
+app.options('*', (req, res) => res.status(204).end());
 app.use(express.json());
 
 app.get('/health', (req, res) => {
@@ -43,6 +70,19 @@ app.use('/api/reviews', reviewsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/contact', contactRoutes);
+
+// Serve React app when client/dist exists (e.g. single deploy on Render)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDirs = [
+  path.join(process.cwd(), 'client', 'dist'),
+  path.join(process.cwd(), '..', 'client', 'dist'),
+  path.join(__dirname, '..', '..', '..', 'client', 'dist'),
+];
+const clientDist = clientDirs.find((dir) => fs.existsSync(dir));
+if (clientDist) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
 
 // Error handler so CORS headers are still sent on errors
 app.use((err, req, res, next) => {

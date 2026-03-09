@@ -1,0 +1,13 @@
+{
+  "name": "buildwise",
+  "private": true,
+  "description": "Buildwise – full-stack app (client + API)",
+  "scripts": {
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm ci && npm run build",
+    "build:server": "cd server && npm ci",
+    "start": "node server/src/index.js",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev"
+  }
+}
