@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { supabase } from '../lib/supabase.js';
+import { autoCompletePastBookings } from '../lib/bookingAutoComplete.js';
 
 const router = Router();
 const admin = [requireAuth, requireRole('admin')];
@@ -158,6 +159,8 @@ router.patch('/users/:id', ...admin, async (req, res) => {
 router.get('/bookings', ...admin, async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Service unavailable' });
+
+    await autoCompletePastBookings(supabase);
 
     const { data: rows, error } = await supabase
       .from('bookings')

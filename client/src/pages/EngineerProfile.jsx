@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
 import {
@@ -11,10 +11,12 @@ import {
   MessageCircle,
   Check,
   Calendar,
+  X,
 } from 'lucide-react';
 
 export default function EngineerProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [engineer, setEngineer] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -22,12 +24,11 @@ export default function EngineerProfile() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [requestSent, setRequestSent] = useState(false);
   const [requestError, setRequestError] = useState('');
-  const [requesting, setRequesting] = useState(false);
   const [requestDatetime, setRequestDatetime] = useState('');
   const [requestDurationValue, setRequestDurationValue] = useState('1');
   const [requestDurationUnit, setRequestDurationUnit] = useState('hours');
+  const [projectModal, setProjectModal] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,36 +52,41 @@ export default function EngineerProfile() {
     return () => { cancelled = true; };
   }, [id]);
 
+  useEffect(() => {
+    if (!projectModal) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setProjectModal(null);
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [projectModal]);
+
   const handleRequestConsultation = async (e) => {
     e.preventDefault();
     if (!requestDatetime.trim()) return;
-    setRequesting(true);
     setRequestError('');
     const val = Number(requestDurationValue) || 1;
     const durationHours = requestDurationUnit === 'days' ? val * 24 : val;
     if (durationHours < 0.25 || durationHours > 720) {
       setRequestError('Duration must be between 15 min and 30 days.');
-      setRequesting(false);
       return;
     }
-    try {
-      await apiFetch('/api/bookings', {
-        method: 'POST',
-        body: JSON.stringify({
-          engineer_id: id,
-          datetime: new Date(requestDatetime).toISOString(),
-          duration_hours: durationHours,
-        }),
-      });
-      setRequestSent(true);
-      setRequestDatetime('');
-      setRequestDurationValue('1');
-      setRequestDurationUnit('hours');
-    } catch (e) {
-      setRequestError(e.message);
-    } finally {
-      setRequesting(false);
-    }
+    navigate(`/engineers/${id}/payment`, {
+      state: {
+        engineerId: id,
+        engineerName: engineer.name,
+        profession: engineer.profession,
+        avatarUrl: engineer.avatar_url,
+        hourlyRate: engineer.hourly_rate != null ? Number(engineer.hourly_rate) : null,
+        datetime: new Date(requestDatetime).toISOString(),
+        durationHours,
+      },
+    });
   };
 
   if (loading) {
@@ -103,6 +109,12 @@ export default function EngineerProfile() {
   }
 
   const reviewCount = reviews.length;
+  const durationPreviewValue = Number(requestDurationValue) || 1;
+  const durationPreviewHours = requestDurationUnit === 'days' ? durationPreviewValue * 24 : durationPreviewValue;
+  const estimatedTotal =
+    engineer.hourly_rate != null
+      ? Math.round(durationPreviewHours * Number(engineer.hourly_rate) * 100) / 100
+      : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -239,33 +251,41 @@ export default function EngineerProfile() {
               ) : (
                 <ul className="grid gap-4 sm:grid-cols-2">
                   {projects.map((p) => (
-                    <li
-                      key={p.id}
-                      className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50"
-                    >
-                      {p.media_url && (
-                        <div className="aspect-video bg-gray-200">
-                          <img
-                            src={p.media_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="p-4">
-                        <h3 className="font-medium text-gray-900">{p.title}</h3>
-                        {p.category && (
-                          <span className="text-xs font-medium text-gray-500">{p.category}</span>
+                    <li key={p.id} className="list-none">
+                      <button
+                        type="button"
+                        onClick={() => setProjectModal(p)}
+                        className="group w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-50 text-left transition-shadow hover:border-primary/30 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                        {p.media_url && (
+                          <div className="aspect-video bg-gray-200">
+                            <img
+                              src={p.media_url}
+                              alt=""
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                            />
+                          </div>
                         )}
-                        {p.description && (
-                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{p.description}</p>
-                        )}
-                        {(p.location || p.year_completed) && (
-                          <p className="text-xs text-gray-500 mt-2">
-                            {[p.location, p.year_completed].filter(Boolean).join(' · ')}
+                        <div className="p-4">
+                          <h3 className="font-medium text-gray-900 group-hover:text-blue-500">
+                            {p.title}
+                          </h3>
+                          {p.category && (
+                            <span className="text-xs font-medium text-gray-500">{p.category}</span>
+                          )}
+                          {p.description && (
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{p.description}</p>
+                          )}
+                          {(p.location || p.year_completed) && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              {[p.location, p.year_completed].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                          <p className="mt-2 text-xs font-medium text-blue-500">
+                            View full project
                           </p>
-                        )}
-                      </div>
+                        </div>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -336,73 +356,67 @@ export default function EngineerProfile() {
                 <div className="mt-6 space-y-3">
                   {profile?.role === 'client' && user && (
                     <>
-                      {requestSent ? (
-                        <p className="text-sm text-gray-600">
-                          Request sent. Check{' '}
-                          <Link to="/bookings" className="font-medium text-black hover:underline">
-                            My bookings
-                          </Link>{' '}
-                          for status.
-                        </p>
-                      ) : (
-                        <form onSubmit={handleRequestConsultation} className="space-y-3">
-                          {requestError && (
-                            <p className="text-sm text-red-600">{requestError}</p>
-                          )}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Date & time
-                            </label>
+                      <form onSubmit={handleRequestConsultation} className="space-y-3">
+                        {requestError && (
+                          <p className="text-sm text-red-600">{requestError}</p>
+                        )}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Date & time
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={requestDatetime}
+                            onChange={(e) => setRequestDatetime(e.target.value)}
+                            min={new Date().toISOString().slice(0, 16)}
+                            required
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Consultation duration
+                          </label>
+                          <div className="flex gap-2">
                             <input
-                              type="datetime-local"
-                              value={requestDatetime}
-                              onChange={(e) => setRequestDatetime(e.target.value)}
-                              min={new Date().toISOString().slice(0, 16)}
-                              required
-                              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
+                              type="number"
+                              min={requestDurationUnit === 'days' ? '1' : '0.25'}
+                              max={requestDurationUnit === 'days' ? '30' : '720'}
+                              step={requestDurationUnit === 'days' ? '1' : '0.25'}
+                              value={requestDurationValue}
+                              onChange={(e) => setRequestDurationValue(e.target.value)}
+                              className="w-30 rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
                             />
+                            <select
+                              value={requestDurationUnit}
+                              onChange={(e) => {
+                                const newUnit = e.target.value;
+                                setRequestDurationUnit(newUnit);
+                                if (newUnit === 'days' && (Number(requestDurationValue) < 1 || !requestDurationValue)) {
+                                  setRequestDurationValue('1');
+                                }
+                              }}
+                              className="w-36 rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
+                            >
+                              <option value="hours">Hours</option>
+                              <option value="days">Days</option>
+                            </select>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Consultation duration
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                min={requestDurationUnit === 'days' ? '1' : '0.25'}
-                                max={requestDurationUnit === 'days' ? '30' : '720'}
-                                step={requestDurationUnit === 'days' ? '1' : '0.25'}
-                                value={requestDurationValue}
-                                onChange={(e) => setRequestDurationValue(e.target.value)}
-                                className="w-30 rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
-                              />
-                              <select
-                                value={requestDurationUnit}
-                                onChange={(e) => {
-                                  const newUnit = e.target.value;
-                                  setRequestDurationUnit(newUnit);
-                                  if (newUnit === 'days' && (Number(requestDurationValue) < 1 || !requestDurationValue)) {
-                                    setRequestDurationValue('1');
-                                  }
-                                }}
-                                  className="w-36 rounded-lg border border-gray-200 px-3 py-2 text-gray-900 focus:border-primary focus:ring-1 focus:ring-primary"
-                              >
-                                <option value="hours">Hours</option>
-                                <option value="days">Days</option>
-                              </select>
-                            </div>
-                            <p className="mt-1 text-xs text-gray-500">e.g. 1 hour or 10 days (up to 30 days)</p>
-                          </div>
-                          <button
-                            type="submit"
-                            disabled={requesting}
-                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            <Video className="h-5 w-5" />
-                            {requesting ? 'Sending…' : 'Book Consultation'}
-                          </button>
-                        </form>
-                      )}
+                          <p className="mt-1 text-xs text-gray-500">e.g. 1 hour or 10 days (up to 30 days)</p>
+                          {estimatedTotal != null && (
+                            <p className="mt-2 text-sm font-medium text-gray-700">
+                              Estimated total: ${estimatedTotal.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                        >
+                          <Video className="h-5 w-5" />
+                          Continue to payment
+                        </button>
+                      </form>
                       <Link
                         to={`/chat/${id}`}
                         className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
@@ -453,6 +467,86 @@ export default function EngineerProfile() {
           </div>
         </div>
       </main>
+
+      {/* Project detail modal */}
+      {projectModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="project-modal-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+            aria-label="Close project details"
+            onClick={() => setProjectModal(null)}
+          />
+          <div className="relative z-10 flex max-h-[min(90vh,900px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 sm:px-6">
+              <div className="min-w-0">
+                <h2 id="project-modal-title" className="text-lg font-semibold text-gray-900 sm:text-xl">
+                  {projectModal.title}
+                </h2>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                  {projectModal.category && (
+                    <span className="font-medium text-gray-600">{projectModal.category}</span>
+                  )}
+                  {(projectModal.location || projectModal.year_completed) && (
+                    <span>
+                      {[projectModal.location, projectModal.year_completed].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProjectModal(null)}
+                className="shrink-0 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {projectModal.media_url && (
+                <div className="aspect-video w-full bg-gray-100 sm:aspect-[21/9]">
+                  <img
+                    src={projectModal.media_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+                {projectModal.description ? (
+                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                    {projectModal.description}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500">No description provided.</p>
+                )}
+                {(projectModal.duration || projectModal.budget_range) && (
+                  <dl className="grid gap-3 rounded-xl bg-gray-50 p-4 text-sm sm:grid-cols-2">
+                    {projectModal.duration && (
+                      <div>
+                        <dt className="font-medium text-gray-500">Duration</dt>
+                        <dd className="mt-0.5 text-gray-900">{projectModal.duration}</dd>
+                      </div>
+                    )}
+                    {projectModal.budget_range && (
+                      <div>
+                        <dt className="font-medium text-gray-500">Budget range</dt>
+                        <dd className="mt-0.5 text-gray-900">{projectModal.budget_range}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

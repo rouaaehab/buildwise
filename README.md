@@ -60,21 +60,18 @@ To see the app with sample content (engineer profile, projects, bookings, review
 2. In Supabase go to **Database → SQL Editor**, open `supabase/seed_demo_data.sql`, and run it.
 3. Refresh the app: **Browse engineers** shows the engineer with bio and projects, **My bookings** and **Messages** show the demo data. Log in as client to see bookings and chat; as engineer to see incoming booking and chat.
 
-## Deploy full app on Render (one service)
+## Deploy
 
-The repo is set up so **one Render Web Service** serves both the API and the React app (no CORS, same origin).
+**Full guide:** [DEPLOYMENT.md](./DEPLOYMENT.md) (Render one-service, Vercel + Render, Supabase auth URLs, checklist).
 
-1. In [Render](https://render.com), create a **Web Service**, connect this repo, and use the **root** as the directory.
-2. **Build command:** `npm run build`  
-   **Start command:** `npm start`
-3. **Environment variables** (Settings → Environment):
-   - `VITE_API_URL` – leave **empty** (so the client uses same-origin `/api`)
-   - `VITE_SUPABASE_URL` – your Supabase project URL
-   - `VITE_SUPABASE_ANON_KEY` – Supabase anon key
-   - `SUPABASE_URL` – same as above
-   - `SUPABASE_SERVICE_ROLE_KEY` – Supabase service role key (from Project Settings → API)
+**Quick — Render (app + API on one URL):**
 
-After deploy, the app and API are at the same URL (e.g. `https://buildwise-xxxx.onrender.com`). You can also use the optional `render.yaml` in the repo as a Blueprint.
+1. Push the repo to GitHub and connect it in [Render](https://render.com) → **Web Service** (repo root).
+2. **Build:** `npm run build` · **Start:** `npm start`
+3. Set env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (leave `VITE_API_URL` unset).
+4. In Supabase **Authentication → URL configuration**, set **Site URL** and **Redirect URLs** to your Render URL.
+
+Optional: import **`render.yaml`** as a Render Blueprint, then add the same env vars in the dashboard.
 
 ## Scripts
 

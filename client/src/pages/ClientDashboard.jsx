@@ -5,6 +5,7 @@ import { apiFetch } from '../lib/api';
 import { uploadAvatar } from '../lib/uploadAvatar';
 import ClientDashboardLayout from '../components/ClientDashboardLayout';
 import { Calendar, MessageCircle, Video, ChevronRight, Users } from 'lucide-react';
+import { effectiveBookingStatus } from '../lib/bookingStatus';
 
 function formatDate(dt) {
   return new Date(dt).toLocaleDateString(undefined, { dateStyle: 'medium' });
@@ -43,7 +44,8 @@ export default function ClientDashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when user id changes, not token refresh
+  }, [user?.id]);
 
   useEffect(() => {
     if (profile) {
@@ -52,6 +54,7 @@ export default function ClientDashboard() {
         avatar_url: profile.avatar_url ?? '',
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when name/avatar change, not full profile ref
   }, [profile?.name, profile?.avatar_url]);
 
   const handleAvatarUpload = async (e) => {
@@ -97,11 +100,11 @@ export default function ClientDashboard() {
 
   const { stats, upcoming, nextBooking } = useMemo(() => {
     const list = bookings || [];
-    const pending = list.filter((b) => b.status === 'pending').length;
-    const accepted = list.filter((b) => b.status === 'accepted').length;
-    const completed = list.filter((b) => b.status === 'completed').length;
+    const pending = list.filter((b) => effectiveBookingStatus(b) === 'pending').length;
+    const accepted = list.filter((b) => effectiveBookingStatus(b) === 'accepted').length;
+    const completed = list.filter((b) => effectiveBookingStatus(b) === 'completed').length;
     const upcomingList = [...list]
-      .filter((b) => ['pending', 'accepted'].includes(b.status))
+      .filter((b) => ['pending', 'accepted'].includes(effectiveBookingStatus(b)))
       .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
       .slice(0, 5);
     const next = upcomingList[0] || null;
@@ -143,10 +146,9 @@ export default function ClientDashboard() {
               <p className="text-xs text-gray-600 mt-0.5">
                 {formatDate(b.datetime)} · {formatTime(b.datetime)}
               </p>
-              <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                b.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {b.status}
+              <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${effectiveBookingStatus(b) === 'accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                {effectiveBookingStatus(b)}
               </span>
               <Link to={`/chat/${b.engineer_id}`} className="mt-1 inline-block text-xs text-indigo-600 hover:underline">
                 Message
@@ -248,14 +250,13 @@ export default function ClientDashboard() {
                     <p className="text-sm text-gray-500 mt-1">
                       {formatDateTime(nextBooking.datetime)}
                     </p>
-                    <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      nextBooking.status === 'accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {nextBooking.status}
+                    <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${effectiveBookingStatus(nextBooking) === 'accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                      {effectiveBookingStatus(nextBooking)}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {nextBooking.status === 'accepted' && nextBooking.zoom_link && (
+                    {(effectiveBookingStatus(nextBooking) === 'accepted' || effectiveBookingStatus(nextBooking) === 'completed') && nextBooking.zoom_link && (
                       <a
                         href={nextBooking.zoom_link}
                         target="_blank"

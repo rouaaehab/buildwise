@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '../lib/api';
 import { Calendar, MessageCircle, Video, Star, ChevronRight } from 'lucide-react';
+import { effectiveBookingStatus, getBookingEndMs } from '../lib/bookingStatus';
 
 export default function Bookings() {
+  const location = useLocation();
   const { user, profile, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,9 @@ export default function Bookings() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+    // Only refetch when logged-in user id changes (not on every new `user` object from token refresh).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const getDurationHoursForBooking = (booking) => {
     const val = durationValue[booking.id] != null ? Number(durationValue[booking.id]) : null;
@@ -162,11 +166,6 @@ export default function Bookings() {
     }
   };
 
-  const formatDateTime = (dt) => {
-    const d = new Date(dt);
-    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-  };
-
   const formatDate = (dt) => new Date(dt).toLocaleDateString(undefined, { dateStyle: 'medium' });
   const formatTime = (dt) => new Date(dt).toLocaleTimeString(undefined, { timeStyle: 'short' });
 
@@ -187,13 +186,21 @@ export default function Bookings() {
     }
   };
 
-  const hasBookingDatePassed = (b) => new Date(b.datetime) <= new Date();
+  /** Consultation window has ended (start + duration). */
+  const hasConsultationEnded = (b) => {
+    const end = getBookingEndMs(b);
+    return end != null && end <= Date.now();
+  };
 
-  const canReview = (b) =>
-    !isEngineer &&
-    ['accepted', 'completed'].includes(b.status) &&
-    !b.review &&
-    hasBookingDatePassed(b);
+  const canReview = (b) => {
+    const eff = effectiveBookingStatus(b);
+    return (
+      !isEngineer &&
+      ['accepted', 'completed'].includes(eff) &&
+      !b.review &&
+      hasConsultationEnded(b)
+    );
+  };
 
   const handleSubmitReview = async (bookingId) => {
     setSubmittingReview(true);
@@ -244,7 +251,7 @@ export default function Bookings() {
   const filteredBookings =
     filter === 'all'
       ? bookings
-      : bookings.filter((b) => b.status === filter);
+      : bookings.filter((b) => effectiveBookingStatus(b) === filter);
 
   const tabs = [
     { value: 'all', label: 'All' },
@@ -273,6 +280,15 @@ export default function Bookings() {
         </div>
       )}
 
+      {location.state?.paymentSuccess && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Payment demo completed and your consultation request with{' '}
+          <span className="font-semibold">{location.state.engineerName || 'the engineer'}</span>{' '}
+          was created successfully
+          {location.state.amount != null ? ` for $${Number(location.state.amount).toFixed(2)}` : ''}.
+        </div>
+      )}
+
       {/* Filter tabs */}
       {bookings.length > 0 && (
         <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1">
@@ -281,11 +297,10 @@ export default function Bookings() {
               key={value}
               type="button"
               onClick={() => setFilter(value)}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                filter === value
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${filter === value
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               {label}
             </button>
@@ -330,7 +345,8 @@ export default function Bookings() {
       ) : (
         <ul className="space-y-4">
           {filteredBookings.map((b) => {
-            const status = statusConfig(b.status);
+            const effective = effectiveBookingStatus(b);
+            const status = statusConfig(effective);
             const name = isEngineer ? b.client_name : b.engineer_name;
             const otherId = isEngineer ? b.client_id : b.engineer_id;
 
@@ -372,7 +388,7 @@ export default function Bookings() {
                         )}
                       </div>
                       <div className="mt-4 flex flex-wrap gap-3">
-                        {b.zoom_link && b.status === 'accepted' && (
+                        {b.zoom_link && (effective === 'accepted' || effective === 'completed') && (
                           <a
                             href={b.zoom_link}
                             target="_blank"
@@ -460,7 +476,7 @@ export default function Bookings() {
                     </div>
 
                     {/* Engineer: accept/reject/reschedule/cancel + zoom + duration for pending */}
-                    {isEngineer && b.status === 'pending' && (
+                    {isEngineer && effectiveBookingStatus(b) === 'pending' && (
                       <div className="shrink-0 space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 sm:w-92">
                         <label className="block text-xs font-medium text-amber-900">Consultation duration</label>
                         <div className="flex gap-2">
@@ -575,7 +591,7 @@ export default function Bookings() {
                       </div>
                     )}
                     {/* Engineer: reschedule or cancel accepted booking; set duration if missing */}
-                    {isEngineer && b.status === 'accepted' && (
+                    {isEngineer && effectiveBookingStatus(b) === 'accepted' && (
                       <div className="shrink-0 space-y-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4 sm:w-64">
                         {reschedulingBookingId !== b.id ? (
                           <>

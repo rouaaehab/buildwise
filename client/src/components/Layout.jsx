@@ -9,7 +9,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className={(isHome ? '' : 'pt-14') + ' flex-1'}>
+      <main className={(isHome ? '' : 'pt-14') + ' relative flex-1'}>
         <Outlet />
       </main>
       <Footer />

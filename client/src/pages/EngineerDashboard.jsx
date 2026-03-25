@@ -7,10 +7,8 @@ import { uploadProjectImage } from '../lib/uploadProjectImage';
 import { uploadCertificateDocument } from '../lib/uploadCertificateDocument';
 import EngineerDashboardLayout from '../components/EngineerDashboardLayout';
 import { Bell, MoreHorizontal, MapPin, Briefcase, Star } from 'lucide-react';
+import { effectiveBookingStatus } from '../lib/bookingStatus';
 
-function formatDate(dt) {
-  return new Date(dt).toLocaleDateString(undefined, { dateStyle: 'medium' });
-}
 function formatDateLong(dt) {
   return new Date(dt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -29,6 +27,7 @@ function isToday(dt) {
 const CALENDAR_STATUS_STYLES = {
   pending: { border: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-800', label: 'Pending' },
   accepted: { border: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-800', label: 'Accepted' },
+  completed: { border: 'border-l-slate-400', badge: 'bg-slate-100 text-slate-700', label: 'Completed' },
 };
 
 export default function EngineerDashboard() {
@@ -112,15 +111,18 @@ export default function EngineerDashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, profile?.role, profile?.name, profile?.avatar_url]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid refetch on every new `user` ref (token refresh)
+  }, [user?.id, profile?.role, profile?.name, profile?.avatar_url]);
 
   const { stats, todayTasks, upcoming, upcomingByDate, activeBookings } = useMemo(() => {
     const list = bookings || [];
-    const pending = list.filter((b) => b.status === 'pending').length;
-    const accepted = list.filter((b) => b.status === 'accepted').length;
-    const completed = list.filter((b) => b.status === 'completed').length;
+    const pending = list.filter((b) => effectiveBookingStatus(b) === 'pending').length;
+    const accepted = list.filter((b) => effectiveBookingStatus(b) === 'accepted').length;
+    const completed = list.filter((b) => effectiveBookingStatus(b) === 'completed').length;
     const today = list.filter((b) => isToday(b.datetime));
-    const sorted = [...list].filter((b) => ['pending', 'accepted'].includes(b.status)).sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+    const sorted = [...list]
+      .filter((b) => ['pending', 'accepted'].includes(effectiveBookingStatus(b)))
+      .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
     const next = sorted.slice(0, 14);
     const byDate = {};
     next.forEach((b) => {
@@ -138,7 +140,7 @@ export default function EngineerDashboard() {
       todayTasks: today,
       upcoming: sorted.slice(0, 7),
       upcomingByDate: Object.entries(byDate),
-      activeBookings: list.filter((b) => b.status === 'accepted'),
+      activeBookings: list.filter((b) => effectiveBookingStatus(b) === 'accepted'),
     };
   }, [bookings]);
 
@@ -471,7 +473,8 @@ export default function EngineerDashboard() {
               </div>
               <ul className="mt-3 space-y-4">
                 {events.map((b) => {
-                  const style = CALENDAR_STATUS_STYLES[b.status] || CALENDAR_STATUS_STYLES.pending;
+                  const eff = effectiveBookingStatus(b);
+                  const style = CALENDAR_STATUS_STYLES[eff] || CALENDAR_STATUS_STYLES.pending;
                   return (
                     <li key={b.id} className="flex gap-3">
                       <span className="text-sm font-bold text-indigo-900 tabular-nums">{formatTime(b.datetime)}</span>

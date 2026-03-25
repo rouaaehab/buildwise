@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { supabase } from '../lib/supabase.js';
+import { autoCompletePastBookings } from '../lib/bookingAutoComplete.js';
 
 const router = Router();
 
@@ -28,6 +29,8 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Service unavailable' });
     const userId = req.user.id;
+
+    await autoCompletePastBookings(supabase, { userId });
 
     const { data: rows, error } = await supabase
       .from('bookings')
@@ -102,6 +105,21 @@ router.post('/', requireAuth, requireRole('client'), async (req, res) => {
       return res.status(400).json({ error: 'Cannot book yourself' });
     }
 
+    const { data: engineerRateProfile, error: engineerProfileError } = await supabase
+      .from('engineer_profiles')
+      .select('hourly_rate')
+      .eq('user_id', engineer_id)
+      .single();
+
+    if (engineerProfileError) {
+      return res.status(400).json({ error: 'Engineer profile not found' });
+    }
+
+    const rate = engineerRateProfile?.hourly_rate != null ? Number(engineerRateProfile.hourly_rate) : null;
+    const amount = rate != null && !Number.isNaN(rate)
+      ? Math.round(hours * rate * 100) / 100
+      : null;
+
     const { data, error } = await supabase
       .from('bookings')
       .insert({
@@ -110,6 +128,7 @@ router.post('/', requireAuth, requireRole('client'), async (req, res) => {
         datetime: dt.toISOString(),
         status: 'pending',
         duration_hours: hours,
+        amount,
       })
       .select()
       .single();

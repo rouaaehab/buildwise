@@ -8,6 +8,7 @@ import EngineerDashboard from './pages/EngineerDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import BrowseEngineers from './pages/BrowseEngineers';
 import EngineerProfile from './pages/EngineerProfile';
+import Payment from './pages/Payment';
 import Bookings from './pages/Bookings';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/dashboard/client" element={<ClientDashboard />} />
             <Route path="/engineers" element={<BrowseEngineers />} />
             <Route path="/engineers/:id" element={<EngineerProfile />} />
+            <Route path="/engineers/:id/payment" element={<Payment />} />
             <Route path="/bookings" element={<Bookings />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat/:userId" element={<ChatThread />} />
