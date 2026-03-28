@@ -5,22 +5,23 @@ const router = Router();
 
 /**
  * GET /api/engineers
- * List engineers (public). Query: skill (filter by skill), minRating, sort=rating|experience|name
+ * List engineers (public). Query: q (free text: name, profession, location, bio, skills),
+ * skill (legacy alias for q), minRating, sort=rating|experience|name
  */
 router.get('/', async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Service unavailable' });
 
-    const { skill, minRating, sort = 'rating' } = req.query;
+    const { q, skill, minRating, sort = 'rating' } = req.query;
+    const searchRaw =
+      (typeof q === 'string' ? q : '').trim() ||
+      (typeof skill === 'string' ? skill : '').trim();
+    const searchLower = searchRaw.toLowerCase();
 
     let query = supabase
       .from('engineer_profiles')
       .select('id, user_id, bio, skills, experience_years, rating, availability, profession, location, hourly_rate')
       .eq('approved', true);
-
-    if (skill && typeof skill === 'string' && skill.trim()) {
-      query = query.contains('skills', [skill.trim()]);
-    }
     if (minRating != null && !Number.isNaN(Number(minRating))) {
       query = query.gte('rating', Number(minRating));
     }
@@ -66,7 +67,23 @@ router.get('/', async (req, res) => {
       engineers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }
 
-    res.json({ engineers });
+    let result = engineers;
+    if (searchLower) {
+      result = engineers.filter((e) => {
+        const chunks = [
+          e.name,
+          e.profession,
+          e.location,
+          e.bio,
+          ...(Array.isArray(e.skills) ? e.skills : []),
+        ]
+          .filter(Boolean)
+          .map((s) => String(s).toLowerCase());
+        return chunks.some((c) => c.includes(searchLower));
+      });
+    }
+
+    res.json({ engineers: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -9,14 +9,14 @@ export default function BrowseEngineers() {
   const [engineers, setEngineers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [skill, setSkill] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [minRating, setMinRating] = useState('');
   const [sort, setSort] = useState('rating');
 
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams();
-    if (skill.trim()) params.set('skill', skill.trim());
+    if (searchQuery.trim()) params.set('q', searchQuery.trim());
     if (minRating !== '') params.set('minRating', minRating);
     if (sort) params.set('sort', sort);
 
@@ -33,7 +33,7 @@ export default function BrowseEngineers() {
       }
     })();
     return () => { cancelled = true; };
-  }, [skill, minRating, sort]);
+  }, [searchQuery, minRating, sort]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,13 +63,13 @@ export default function BrowseEngineers() {
           <div className="mt-6 flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4">
             <div className="flex-1 min-w-[140px]">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                Skill
+                Search
               </label>
               <input
-                type="text"
-                value={skill}
-                onChange={(e) => setSkill(e.target.value)}
-                placeholder="e.g. Structural, Revit"
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Name, skill, location, bio…"
                 className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>

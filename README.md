@@ -99,7 +99,7 @@ Optional: import **`render.yaml`** as a Render Blueprint, then add the same env 
 
 - **Browse engineers** at `/engineers`: list all engineers with filters (skill, min rating) and sort (rating, experience, name). Click a card to view full profile.
 - **Engineer profile** at `/engineers/:id`: full bio, skills, experience, rating, availability, and portfolio projects.
-- API: `GET /api/engineers?skill=&minRating=&sort=rating|experience|name`, `GET /api/engineers/:id`.
+- API: `GET /api/engineers?q=&minRating=&sort=rating|experience|name` (`skill=` still accepted as legacy alias for `q`), `GET /api/engineers/:id`.
 
 ## Phase 5 – Booking system (done)
 
